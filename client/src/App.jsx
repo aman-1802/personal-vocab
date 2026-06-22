@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Search, Loader2, Check, AlertCircle, BarChart as BarIcon, Layers, BookOpen, Plus, ChevronLeft } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Search, Loader2, Check, AlertCircle, BarChart as BarIcon, Layers, BookOpen, Plus, ChevronLeft, Share2 } from "lucide-react";
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from "recharts";
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
 
 const CREAM = "#F5F0E4";
 const INK = "#1A1A17";
 const TINTS = ["#F2C94C", "#F39DB7", "#A9C7E8", "#C7D98C"];
+const MIN_WORDS_FOR_WEB = 6;
 
 function burstPath(points, outer, inner, cx, cy) {
   let d = "";
@@ -45,6 +47,10 @@ function relative(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function nodeColor(id) {
+  return TINTS[id.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 4];
+}
+
 export default function VocabApp() {
   const [view, setView] = useState("search");
   const [query, setQuery] = useState("");
@@ -55,32 +61,125 @@ export default function VocabApp() {
   const [words, setWords] = useState([]);
   const [books, setBooks] = useState([]);
   const [stats, setStats] = useState(null);
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [selectedNode, setSelectedNode] = useState(null);
   const [openBook, setOpenBook] = useState(null);
   const [newBook, setNewBook] = useState("");
   const [newNote, setNewNote] = useState("");
 
+  const graphContainerRef = useRef(null);
+  const graphInstanceRef = useRef(null);
+
   const loadWords = useCallback(async () => {
-    try {
-      const res = await fetch("/api/words");
-      if (res.ok) setWords(await res.json());
-    } catch (e) { console.error(e); }
+    try { const res = await fetch("/api/words"); if (res.ok) setWords(await res.json()); } catch (e) { console.error(e); }
   }, []);
-
   const loadBooks = useCallback(async () => {
-    try {
-      const res = await fetch("/api/books");
-      if (res.ok) setBooks(await res.json());
-    } catch (e) { console.error(e); }
+    try { const res = await fetch("/api/books"); if (res.ok) setBooks(await res.json()); } catch (e) { console.error(e); }
   }, []);
-
   const loadStats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/stats");
-      if (res.ok) setStats(await res.json());
-    } catch (e) { console.error(e); }
+    try { const res = await fetch("/api/stats"); if (res.ok) setStats(await res.json()); } catch (e) { console.error(e); }
+  }, []);
+  const loadGraph = useCallback(async () => {
+    try { const res = await fetch("/api/graph"); if (res.ok) setGraphData(await res.json()); } catch (e) { console.error(e); }
   }, []);
 
-  useEffect(() => { loadWords(); loadBooks(); loadStats(); }, [loadWords, loadBooks, loadStats]);
+  useEffect(() => { loadWords(); loadBooks(); loadStats(); loadGraph(); }, [loadWords, loadBooks, loadStats, loadGraph]);
+
+  useEffect(() => {
+    if (view === "web") loadGraph();
+  }, [view, loadGraph]);
+
+  // Pure canvas + d3-force graph — zero React/Preact bundled inside
+  useEffect(() => {
+    const container = graphContainerRef.current;
+    if (view !== "web" || graphData.nodes.length < MIN_WORDS_FOR_WEB || !container) return;
+
+    const w = container.offsetWidth;
+    const h = container.offsetHeight;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    container.innerHTML = "";
+    container.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+
+    // Clone data so d3 can mutate freely
+    const nodes = graphData.nodes.map((n) => ({ ...n }));
+    const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
+    const links = graphData.links.map((l) => ({
+      source: nodeById[typeof l.source === "string" ? l.source : l.source.id] || l.source,
+      target: nodeById[typeof l.target === "string" ? l.target : l.target.id] || l.target,
+    }));
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = CREAM;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = "rgba(26,26,23,0.12)";
+      ctx.lineWidth = 1.5;
+      for (const l of links) {
+        if (l.source?.x != null && l.target?.x != null) {
+          ctx.beginPath();
+          ctx.moveTo(l.source.x, l.source.y);
+          ctx.lineTo(l.target.x, l.target.y);
+          ctx.stroke();
+        }
+      }
+
+      ctx.font = "600 10px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const n of nodes) {
+        if (n.x == null) continue;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 22, 0, 2 * Math.PI);
+        ctx.fillStyle = nodeColor(n.id);
+        ctx.fill();
+        ctx.fillStyle = INK;
+        ctx.fillText(n.id.length > 9 ? n.id.slice(0, 8) + "…" : n.id, n.x, n.y);
+      }
+    }
+
+    const sim = forceSimulation(nodes)
+      .force("link", forceLink(links).id((d) => d.id).distance(90))
+      .force("charge", forceManyBody().strength(-220))
+      .force("center", forceCenter(w / 2, h / 2))
+      .force("collide", forceCollide(28))
+      .on("tick", draw);
+
+    function onClick(e) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const hit = nodes.find((n) => {
+        const dx = (n.x ?? 0) - mx;
+        const dy = (n.y ?? 0) - my;
+        return Math.sqrt(dx * dx + dy * dy) < 22;
+      });
+      setSelectedNode((prev) => (prev?.id === hit?.id ? null : hit ?? null));
+    }
+    canvas.addEventListener("click", onClick);
+
+    graphInstanceRef.current = sim;
+    return () => {
+      sim.stop();
+      canvas.removeEventListener("click", onClick);
+      graphInstanceRef.current = null;
+      if (container) container.innerHTML = "";
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, graphData.nodes.length]);
+
+  // Re-run simulation when new words are added while on the Web tab
+  useEffect(() => {
+    if (graphInstanceRef.current && graphData.nodes.length >= MIN_WORDS_FOR_WEB) {
+      graphInstanceRef.current.alpha(0.5).restart();
+    }
+  }, [graphData]);
 
   async function handleSearch(e) {
     e?.preventDefault();
@@ -88,15 +187,11 @@ export default function VocabApp() {
     if (!word || loading) return;
     setError(null); setJustSaved(false); setLoading(true);
     try {
-      const res = await fetch("/api/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word }),
-      });
+      const res = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ word }) });
       if (!res.ok) throw new Error("lookup failed");
       const data = await res.json();
       setResult(data);
-      if (data.isNew) { setJustSaved(true); loadWords(); loadStats(); }
+      if (data.isNew) { setJustSaved(true); loadWords(); loadStats(); loadGraph(); }
       setQuery("");
     } catch (e) { console.error(e); setError("Couldn't look that up. Try again?"); }
     setLoading(false);
@@ -107,15 +202,9 @@ export default function VocabApp() {
     const title = newBook.trim();
     if (!title) return;
     try {
-      const res = await fetch("/api/books", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
+      const res = await fetch("/api/books", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
       if (!res.ok) return;
-      setNewBook("");
-      await loadBooks();
-      await loadStats();
+      setNewBook(""); await loadBooks(); await loadStats();
     } catch (e) { console.error(e); }
   }
 
@@ -124,20 +213,16 @@ export default function VocabApp() {
     const text = newNote.trim();
     if (!text) return;
     try {
-      const res = await fetch(`/api/books/${book.id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      const res = await fetch(`/api/books/${book.id}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
       if (!res.ok) return;
-      setNewNote("");
-      await loadBooks();
+      setNewNote(""); await loadBooks();
     } catch (e) { console.error(e); }
   }
 
   const last7 = stats?.last7Days || [];
   const screenBg = view === "stats" ? "#F3B8C8" : CREAM;
   const currentBook = books.find((b) => b.id === openBook);
+  const wordsUntilWeb = Math.max(0, MIN_WORDS_FOR_WEB - graphData.nodes.length);
 
   return (
     <div
@@ -209,7 +294,7 @@ export default function VocabApp() {
         </div>
       )}
 
-      {/* ===== LIBRARY (words) ===== */}
+      {/* ===== LIBRARY ===== */}
       {view === "library" && (
         <div className="flex-1 flex flex-col overflow-hidden">
           <svg className="absolute top-24 -left-10 floaty" width="130" height="130" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#A9C7E8" opacity="0.55" /></svg>
@@ -305,6 +390,51 @@ export default function VocabApp() {
         </div>
       )}
 
+      {/* ===== WEB ===== */}
+      {view === "web" && (
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          <div className="px-6 pt-10 pb-2 relative z-10 shrink-0">
+            <h1 className="font-bold tracking-tight" style={{ fontSize: 38, lineHeight: 1, letterSpacing: "-0.03em" }}>Word<br /><span className="italic" style={{ fontFamily: "Georgia,serif", fontWeight: 500 }}>web</span></h1>
+            <p className="text-sm text-stone-500 mt-1">{graphData.nodes.length} word{graphData.nodes.length !== 1 ? "s" : ""} · {graphData.links.length} connection{graphData.links.length !== 1 ? "s" : ""}</p>
+          </div>
+
+          {wordsUntilWeb > 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+              <div className="flex items-center justify-center gap-3 mb-8">
+                {TINTS.map((t, i) => (
+                  <div key={i} className="floaty rounded-full shadow-md flex items-center justify-center text-[11px] font-bold text-stone-700" style={{ width: 52 + i * 8, height: 52 + i * 8, background: t, "--rot": `${(i - 1.5) * 5}deg`, animationDelay: `${i * 0.4}s` }}>
+                    {["word", "link", "idea", "web"][i]}
+                  </div>
+                ))}
+              </div>
+              <p className="font-bold text-xl text-stone-800 mb-2">Your web is forming</p>
+              <p className="text-stone-500 text-[15px] leading-relaxed">
+                Look up <span className="font-bold text-stone-800">{wordsUntilWeb}</span> more word{wordsUntilWeb !== 1 ? "s" : ""} and watch your first connections appear.
+              </p>
+              <div className="mt-6 bg-white/70 rounded-2xl px-6 py-4 shadow-sm">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-stone-400 mb-1">Words so far</p>
+                <p className="text-3xl font-bold text-stone-800">{graphData.nodes.length} <span className="text-base font-normal text-stone-400">/ {MIN_WORDS_FOR_WEB}</span></p>
+              </div>
+            </div>
+          ) : (
+            <div ref={graphContainerRef} className="flex-1 relative" />
+          )}
+
+          {/* Tapped node card */}
+          {selectedNode && (
+            <div className="absolute bottom-4 left-4 right-4 pop z-30">
+              <div className="rounded-3xl p-4 shadow-xl border border-white/40" style={{ background: nodeColor(selectedNode.id) }}>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-bold text-lg capitalize text-stone-900">{selectedNode.id}</h3>
+                  <button onClick={() => setSelectedNode(null)} className="text-stone-500 text-xl leading-none mt-0.5 shrink-0">×</button>
+                </div>
+                <p className="text-sm text-stone-800/80 mt-1 leading-relaxed">{selectedNode.meaning}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ===== bottom nav ===== */}
       <div className="relative z-20 px-4 pb-6 pt-1">
         <div className="bg-white/50 backdrop-blur-2xl rounded-full shadow-lg border border-white/60 flex items-center justify-around py-2.5 px-1">
@@ -313,12 +443,13 @@ export default function VocabApp() {
             { key: "library", label: "Words", icon: Layers },
             { key: "books", label: "Books", icon: BookOpen },
             { key: "stats", label: "Flow", icon: BarIcon },
+            { key: "web", label: "Web", icon: Share2 },
           ].map(({ key, label, icon: Icon }) => {
             const active = view === key;
             return (
-              <button key={key} onClick={() => { setView(key); if (key === "books") setOpenBook(null); }} className={`flex flex-col items-center gap-0.5 px-3.5 py-1.5 rounded-full transition-all duration-300 ${active ? "bg-[#F2C94C]" : ""}`}>
-                <Icon size={18} strokeWidth={2.2} className={active ? "text-stone-900" : "text-stone-400"} />
-                <span className={`text-[10px] font-semibold ${active ? "text-stone-900" : "text-stone-400"}`}>{label}</span>
+              <button key={key} onClick={() => { setView(key); if (key === "books") setOpenBook(null); if (key !== "web") setSelectedNode(null); }} className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-full transition-all duration-300 ${active ? "bg-[#F2C94C]" : ""}`}>
+                <Icon size={17} strokeWidth={2.2} className={active ? "text-stone-900" : "text-stone-400"} />
+                <span className={`text-[9px] font-semibold ${active ? "text-stone-900" : "text-stone-400"}`}>{label}</span>
               </button>
             );
           })}

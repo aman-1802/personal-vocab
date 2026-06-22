@@ -9,6 +9,7 @@ import lookupRouter from './routes/lookup.js';
 import wordsRouter from './routes/words.js';
 import booksRouter from './routes/books.js';
 import statsRouter from './routes/stats.js';
+import graphRouter from './routes/graph.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -21,6 +22,7 @@ app.use('/api/lookup', lookupRouter);
 app.use('/api/words', wordsRouter);
 app.use('/api/books', booksRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/graph', graphRouter);
 
 const distDir = join(__dirname, '../client/dist');
 if (existsSync(distDir)) {
