@@ -162,7 +162,12 @@ export default function VocabApp() {
             <h1 className="font-bold tracking-tight" style={{ fontSize: 40, lineHeight: 0.98, letterSpacing: "-0.03em" }}>What word<br />did you<br /><span className="italic" style={{ fontFamily: "Georgia,serif", fontWeight: 500 }}>meet today?</span></h1>
             <form onSubmit={handleSearch} className="relative mt-5">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type a word from your book..." className="w-full bg-white rounded-full pl-11 pr-4 py-3.5 text-stone-900 placeholder-stone-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-black/15" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type a word from your book..." className={`w-full bg-white rounded-full pl-11 py-3.5 text-stone-900 placeholder-stone-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-black/15 transition-all ${query.trim() ? "pr-14" : "pr-4"}`} />
+              {query.trim() && (
+                <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-[#F2C94C] rounded-full p-2.5 shadow-sm active:scale-90 transition-transform">
+                  <Search size={16} strokeWidth={2.5} className="text-stone-900" />
+                </button>
+              )}
             </form>
           </div>
           <div className="flex-1 overflow-y-auto px-5 pt-4 pb-2 relative z-10">
