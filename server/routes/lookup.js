@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import OpenAI from 'openai';
-import db from '../db.js';
+import { db } from '../db.js';
 
 const router = Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -9,16 +9,14 @@ router.post('/', async (req, res) => {
   const raw = (req.body.word || '').trim().toLowerCase();
   if (!raw) return res.status(400).json({ error: 'word is required' });
 
-  const cached = db.prepare('SELECT * FROM words WHERE word = ?').get(raw);
-  if (cached) {
+  const { rows } = await db.execute({ sql: 'SELECT * FROM words WHERE word = ?', args: [raw] });
+  if (rows[0]) {
+    const r = rows[0];
     return res.json({
-      word: cached.word,
-      meaning: cached.meaning,
-      sentence: cached.sentence,
-      synonyms: JSON.parse(cached.synonyms || '[]'),
-      antonyms: JSON.parse(cached.antonyms || '[]'),
-      savedAt: cached.saved_at,
-      isNew: false,
+      word: r.word, meaning: r.meaning, sentence: r.sentence,
+      synonyms: JSON.parse(r.synonyms || '[]'),
+      antonyms: JSON.parse(r.antonyms || '[]'),
+      savedAt: r.saved_at, isNew: false,
     });
   }
 
@@ -31,8 +29,7 @@ Respond with ONLY valid JSON, no markdown, exactly:
 
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 500,
+      model: 'gpt-4o-mini', max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
     });
@@ -40,26 +37,16 @@ Respond with ONLY valid JSON, no markdown, exactly:
     const parsed = JSON.parse(completion.choices[0].message.content);
     const savedAt = new Date().toISOString();
 
-    db.prepare(`
-      INSERT OR REPLACE INTO words (word, meaning, sentence, synonyms, antonyms, saved_at)
-      VALUES (@word, @meaning, @sentence, @synonyms, @antonyms, @saved_at)
-    `).run({
-      word: parsed.word || raw,
-      meaning: parsed.meaning,
-      sentence: parsed.sentence,
-      synonyms: JSON.stringify(parsed.synonyms || []),
-      antonyms: JSON.stringify(parsed.antonyms || []),
-      saved_at: savedAt,
+    await db.execute({
+      sql: 'INSERT OR REPLACE INTO words (word, meaning, sentence, synonyms, antonyms, saved_at) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [parsed.word || raw, parsed.meaning, parsed.sentence,
+             JSON.stringify(parsed.synonyms || []), JSON.stringify(parsed.antonyms || []), savedAt],
     });
 
     res.json({
-      word: parsed.word || raw,
-      meaning: parsed.meaning,
-      sentence: parsed.sentence,
-      synonyms: parsed.synonyms || [],
-      antonyms: parsed.antonyms || [],
-      savedAt,
-      isNew: true,
+      word: parsed.word || raw, meaning: parsed.meaning, sentence: parsed.sentence,
+      synonyms: parsed.synonyms || [], antonyms: parsed.antonyms || [],
+      savedAt, isNew: true,
     });
   } catch (e) {
     console.error(e);

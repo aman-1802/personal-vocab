@@ -4,6 +4,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
+import { initDb } from './db.js';
 import lookupRouter from './routes/lookup.js';
 import wordsRouter from './routes/words.js';
 import booksRouter from './routes/books.js';
@@ -21,11 +22,11 @@ app.use('/api/words', wordsRouter);
 app.use('/api/books', booksRouter);
 app.use('/api/stats', statsRouter);
 
-// Serve the built client in production
 const distDir = join(__dirname, '../client/dist');
 if (existsSync(distDir)) {
   app.use(express.static(distDir));
   app.get('*', (_req, res) => res.sendFile(join(distDir, 'index.html')));
 }
 
+await initDb();
 app.listen(PORT, () => console.log(`vocab server on :${PORT}`));

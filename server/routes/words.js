@@ -1,14 +1,12 @@
 import { Router } from 'express';
-import db from '../db.js';
+import { db } from '../db.js';
 
 const router = Router();
 
-router.get('/', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM words ORDER BY saved_at DESC').all();
+router.get('/', async (_req, res) => {
+  const { rows } = await db.execute('SELECT * FROM words ORDER BY saved_at DESC');
   res.json(rows.map(r => ({
-    word: r.word,
-    meaning: r.meaning,
-    sentence: r.sentence,
+    word: r.word, meaning: r.meaning, sentence: r.sentence,
     synonyms: JSON.parse(r.synonyms || '[]'),
     antonyms: JSON.parse(r.antonyms || '[]'),
     savedAt: r.saved_at,
