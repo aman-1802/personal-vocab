@@ -1,4 +1,4 @@
-const CACHE = 'vocab-v1';
+const CACHE = 'vocab-v2';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
