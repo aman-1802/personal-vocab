@@ -141,7 +141,7 @@ export default function VocabApp() {
 
   return (
     <div
-      className="min-h-[100dvh] w-full flex flex-col overflow-hidden transition-colors duration-500"
+      className="h-[100dvh] w-full flex flex-col overflow-hidden transition-colors duration-500"
       style={{ background: screenBg, color: INK, fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display',Inter,sans-serif" }}
     >
       <style>{`
@@ -302,7 +302,7 @@ export default function VocabApp() {
 
       {/* ===== bottom nav ===== */}
       <div className="relative z-20 px-4 pb-6 pt-1">
-        <div className="bg-white rounded-full shadow-lg flex items-center justify-around py-2.5 px-1">
+        <div className="bg-white/50 backdrop-blur-2xl rounded-full shadow-lg border border-white/60 flex items-center justify-around py-2.5 px-1">
           {[
             { key: "search", label: "Discover", icon: Search },
             { key: "library", label: "Words", icon: Layers },

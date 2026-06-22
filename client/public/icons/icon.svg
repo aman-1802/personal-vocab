@@ -1,4 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#F5F0E4"/>
-  <text x="256" y="370" text-anchor="middle" font-family="Georgia,serif" font-size="320" font-weight="700" fill="#1A1A17">V</text>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#FBF6E9"/>
+      <stop offset="100%" stop-color="#F0E9D6"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+
+  <!-- Mustard burst behind V -->
+  <g transform="translate(512,520) rotate(8)">
+    <path d="M0,-230 L26,-157 L104,-192 L68,-118 L148,-92 L84,-44 L150,16 L76,24 L90,110 L28,68 L12,156 L-26,94 L-84,156 L-80,72 L-152,88 L-120,20 L-188,4 L-130,-48 L-164,-116 L-92,-104 L-96,-192 L-40,-152 Z"
+          fill="#F2C94C" opacity="0.92"/>
+  </g>
+
+  <!-- Pink blob top-right -->
+  <ellipse cx="820" cy="200" rx="130" ry="120" fill="#F39DB7" opacity="0.7" transform="rotate(-12 820 200)"/>
+
+  <!-- Sage blob bottom-left -->
+  <ellipse cx="190" cy="840" rx="160" ry="140" fill="#C7D98C" opacity="0.65" transform="rotate(10 190 840)"/>
+
+  <!-- Small mustard dot top-left -->
+  <circle cx="160" cy="195" r="36" fill="#F2C94C" opacity="0.6"/>
+
+  <!-- Bold V — ink -->
+  <path d="M210 260 L430 760 L512 760 L292 260 Z" fill="#1A1A17"/>
+  <path d="M814 260 L594 760 L512 760 L732 260 Z" fill="#1A1A17"/>
+
+  <!-- Mustard underline accent -->
+  <rect x="376" y="756" width="272" height="20" rx="10" fill="#F2C94C"/>
 </svg>
