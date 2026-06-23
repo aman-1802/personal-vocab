@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Search, Loader2, Check, AlertCircle, BarChart as BarIcon, Layers, BookOpen, Plus, ChevronLeft, Share2 } from "lucide-react";
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from "recharts";
-import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 
 const CREAM = "#F5F0E4";
 const INK = "#1A1A17";
@@ -97,14 +97,19 @@ export default function VocabApp() {
     const w = container.offsetWidth;
     const h = container.offsetHeight;
 
+    const dpr = window.devicePixelRatio || 1;
     const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
     container.innerHTML = "";
     container.appendChild(canvas);
     const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    const R = 24; // node radius
+    const PAD = R + 6; // keep nodes this far from edges
 
     // Clone data so d3 can mutate freely
     const nodes = graphData.nodes.map((n) => ({ ...n }));
@@ -114,12 +119,22 @@ export default function VocabApp() {
       target: nodeById[typeof l.target === "string" ? l.target : l.target.id] || l.target,
     }));
 
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
     function draw() {
+      // Hard-clamp positions so nodes never leave the visible area
+      for (const n of nodes) {
+        if (n.x != null) {
+          n.x = clamp(n.x, PAD, w - PAD);
+          n.y = clamp(n.y, PAD, h - PAD);
+        }
+      }
+
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = CREAM;
       ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = "rgba(26,26,23,0.12)";
+      ctx.strokeStyle = "rgba(26,26,23,0.15)";
       ctx.lineWidth = 1.5;
       for (const l of links) {
         if (l.source?.x != null && l.target?.x != null) {
@@ -130,13 +145,13 @@ export default function VocabApp() {
         }
       }
 
-      ctx.font = "600 10px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.font = `600 10px -apple-system, BlinkMacSystemFont, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       for (const n of nodes) {
         if (n.x == null) continue;
         ctx.beginPath();
-        ctx.arc(n.x, n.y, 22, 0, 2 * Math.PI);
+        ctx.arc(n.x, n.y, R, 0, 2 * Math.PI);
         ctx.fillStyle = nodeColor(n.id);
         ctx.fill();
         ctx.fillStyle = INK;
@@ -145,10 +160,12 @@ export default function VocabApp() {
     }
 
     const sim = forceSimulation(nodes)
-      .force("link", forceLink(links).id((d) => d.id).distance(90))
-      .force("charge", forceManyBody().strength(-220))
-      .force("center", forceCenter(w / 2, h / 2))
-      .force("collide", forceCollide(28))
+      .force("link", forceLink(links).id((d) => d.id).distance(70))
+      .force("charge", forceManyBody().strength(-150))
+      .force("center", forceCenter(w / 2, h / 2).strength(0.08))
+      .force("collide", forceCollide(R + 6))
+      .force("bx", forceX(w / 2).strength(0.04))
+      .force("by", forceY(h / 2).strength(0.04))
       .on("tick", draw);
 
     function onClick(e) {
@@ -158,7 +175,7 @@ export default function VocabApp() {
       const hit = nodes.find((n) => {
         const dx = (n.x ?? 0) - mx;
         const dy = (n.y ?? 0) - my;
-        return Math.sqrt(dx * dx + dy * dy) < 22;
+        return Math.sqrt(dx * dx + dy * dy) < R;
       });
       setSelectedNode((prev) => (prev?.id === hit?.id ? null : hit ?? null));
     }
