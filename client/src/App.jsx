@@ -66,6 +66,7 @@ export default function VocabApp() {
   const [openBook, setOpenBook] = useState(null);
   const [newBook, setNewBook] = useState("");
   const [newNote, setNewNote] = useState("");
+  const [editingNote, setEditingNote] = useState(null); // { noteId, text }
 
   const graphContainerRef = useRef(null);
   const graphInstanceRef = useRef(null);
@@ -243,6 +244,21 @@ export default function VocabApp() {
     } catch (e) { console.error(e); }
   }
 
+  async function saveEditedNote(book) {
+    const text = editingNote?.text?.trim();
+    if (!text || !editingNote) return;
+    try {
+      const res = await fetch(`/api/books/${book.id}/notes/${editingNote.noteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) return;
+      setEditingNote(null);
+      await loadBooks();
+    } catch (e) { console.error(e); }
+  }
+
   const last7 = stats?.last7Days || [];
   const screenBg = view === "stats" ? "#F3B8C8" : CREAM;
   const currentBook = books.find((b) => b.id === openBook);
@@ -379,13 +395,34 @@ export default function VocabApp() {
             {(currentBook.notes?.length || 0) === 0 && <p className="text-sm text-stone-400 px-1 py-6">No notes yet. Jot something below.</p>}
             {(currentBook.notes || []).slice().reverse().map((n) => (
               <div key={n.id} className="pop bg-white rounded-2xl p-3.5 mb-2.5 shadow-sm">
-                <div className="flex items-start gap-2">
-                  <p className="flex-1 text-stone-800 text-[15px] leading-relaxed whitespace-pre-wrap">{n.text}</p>
-                  <button onClick={() => deleteNote(currentBook, n.id)} className="shrink-0 mt-0.5 text-stone-300 active:text-rose-400 transition-colors">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-                <p className="text-xs text-stone-400 mt-1.5">{relative(n.at)}</p>
+                {editingNote?.noteId === n.id ? (
+                  <>
+                    <textarea
+                      autoFocus
+                      value={editingNote.text}
+                      onChange={(e) => setEditingNote({ ...editingNote, text: e.target.value })}
+                      rows={3}
+                      className="w-full text-stone-800 text-[15px] leading-relaxed resize-none focus:outline-none"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={() => saveEditedNote(currentBook)} className="text-xs font-bold bg-[#C7D98C] rounded-full px-3 py-1 text-stone-800 active:opacity-70">Save</button>
+                      <button onClick={() => setEditingNote(null)} className="text-xs font-bold text-stone-400 active:opacity-70">Cancel</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-2">
+                      <p
+                        className="flex-1 text-stone-800 text-[15px] leading-relaxed whitespace-pre-wrap"
+                        onClick={() => setEditingNote({ noteId: n.id, text: n.text })}
+                      >{n.text}</p>
+                      <button onClick={() => deleteNote(currentBook, n.id)} className="shrink-0 mt-0.5 text-stone-300 active:text-rose-400 transition-colors">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-stone-400 mt-1.5">{relative(n.at)}</p>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -394,8 +431,7 @@ export default function VocabApp() {
               <textarea
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addNote(currentBook); } }}
-                placeholder="Add a note... (Enter to save, Shift+Enter for new line)"
+                placeholder="Add a note..."
                 rows={2}
                 className="w-full bg-white rounded-2xl pl-4 pr-12 py-3 text-stone-900 placeholder-stone-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-black/15 resize-none text-[15px] leading-relaxed"
               />

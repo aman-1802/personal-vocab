@@ -47,6 +47,15 @@ router.post('/:id/notes', async (req, res) => {
   res.json(await withNotes(rows[0]));
 });
 
+router.patch('/:bookId/notes/:noteId', async (req, res) => {
+  const { text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+  await db.execute({ sql: 'UPDATE notes SET text = ? WHERE id = ? AND book_id = ?', args: [text.trim(), req.params.noteId, req.params.bookId] });
+  const { rows } = await db.execute({ sql: 'SELECT * FROM books WHERE id = ?', args: [req.params.bookId] });
+  if (!rows[0]) return res.status(404).json({ error: 'not found' });
+  res.json(await withNotes(rows[0]));
+});
+
 router.delete('/:bookId/notes/:noteId', async (req, res) => {
   await db.execute({ sql: 'DELETE FROM notes WHERE id = ? AND book_id = ?', args: [req.params.noteId, req.params.bookId] });
   const { rows } = await db.execute({ sql: 'SELECT * FROM books WHERE id = ?', args: [req.params.bookId] });
