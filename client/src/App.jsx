@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Loader2, Check, AlertCircle, BarChart as BarIcon, Layers, BookOpen, Plus, ChevronLeft, Share2 } from "lucide-react";
+import { Search, Loader2, Check, AlertCircle, BarChart as BarIcon, Layers, BookOpen, Plus, ChevronLeft, Share2, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from "recharts";
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 
@@ -225,14 +225,21 @@ export default function VocabApp() {
     } catch (e) { console.error(e); }
   }
 
-  async function addNote(book, e) {
-    e?.preventDefault();
+  async function addNote(book) {
     const text = newNote.trim();
     if (!text) return;
     try {
       const res = await fetch(`/api/books/${book.id}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
       if (!res.ok) return;
       setNewNote(""); await loadBooks();
+    } catch (e) { console.error(e); }
+  }
+
+  async function deleteNote(book, noteId) {
+    try {
+      const res = await fetch(`/api/books/${book.id}/notes/${noteId}`, { method: "DELETE" });
+      if (!res.ok) return;
+      await loadBooks();
     } catch (e) { console.error(e); }
   }
 
@@ -370,18 +377,30 @@ export default function VocabApp() {
           <div className="flex-1 overflow-y-auto px-5 pt-4 pb-2 relative z-10">
             <p className="text-[11px] font-bold uppercase tracking-widest text-stone-400 mb-2 px-1">Notes</p>
             {(currentBook.notes?.length || 0) === 0 && <p className="text-sm text-stone-400 px-1 py-6">No notes yet. Jot something below.</p>}
-            {(currentBook.notes || []).slice().reverse().map((n, i) => (
-              <div key={i} className="pop bg-white rounded-2xl p-3.5 mb-2.5 shadow-sm">
-                <p className="text-stone-800 text-[15px] leading-relaxed">{n.text}</p>
+            {(currentBook.notes || []).slice().reverse().map((n) => (
+              <div key={n.id} className="pop bg-white rounded-2xl p-3.5 mb-2.5 shadow-sm">
+                <div className="flex items-start gap-2">
+                  <p className="flex-1 text-stone-800 text-[15px] leading-relaxed whitespace-pre-wrap">{n.text}</p>
+                  <button onClick={() => deleteNote(currentBook, n.id)} className="shrink-0 mt-0.5 text-stone-300 active:text-rose-400 transition-colors">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
                 <p className="text-xs text-stone-400 mt-1.5">{relative(n.at)}</p>
               </div>
             ))}
           </div>
           <div className="px-5 pb-3 pt-1 relative z-10">
-            <form onSubmit={(e) => addNote(currentBook, e)} className="relative">
-              <input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add a note..." className="w-full bg-white rounded-full pl-5 pr-12 py-3 text-stone-900 placeholder-stone-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-black/15" />
-              <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-[#C7D98C] rounded-full p-2 shadow-sm active:scale-90 transition-transform"><Plus size={18} strokeWidth={2.5} className="text-stone-900" /></button>
-            </form>
+            <div className="relative">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addNote(currentBook); } }}
+                placeholder="Add a note... (Enter to save, Shift+Enter for new line)"
+                rows={2}
+                className="w-full bg-white rounded-2xl pl-4 pr-12 py-3 text-stone-900 placeholder-stone-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-black/15 resize-none text-[15px] leading-relaxed"
+              />
+              <button onClick={() => addNote(currentBook)} className="absolute right-2 bottom-2 bg-[#C7D98C] rounded-full p-2 shadow-sm active:scale-90 transition-transform"><Plus size={18} strokeWidth={2.5} className="text-stone-900" /></button>
+            </div>
           </div>
         </div>
       )}

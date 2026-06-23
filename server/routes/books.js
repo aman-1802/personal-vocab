@@ -12,7 +12,7 @@ async function withNotes(book) {
     id: book.id,
     title: book.title,
     addedAt: book.added_at,
-    notes: rows.map(n => ({ text: n.text, at: n.created_at })),
+    notes: rows.map(n => ({ id: n.id, text: n.text, at: n.created_at })),
   };
 }
 
@@ -44,6 +44,13 @@ router.post('/:id/notes', async (req, res) => {
     sql: 'INSERT INTO notes (id, book_id, text, created_at) VALUES (?, ?, ?, ?)',
     args: [Date.now().toString(), req.params.id, text.trim(), new Date().toISOString()],
   });
+  res.json(await withNotes(rows[0]));
+});
+
+router.delete('/:bookId/notes/:noteId', async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM notes WHERE id = ? AND book_id = ?', args: [req.params.noteId, req.params.bookId] });
+  const { rows } = await db.execute({ sql: 'SELECT * FROM books WHERE id = ?', args: [req.params.bookId] });
+  if (!rows[0]) return res.status(404).json({ error: 'not found' });
   res.json(await withNotes(rows[0]));
 });
 
