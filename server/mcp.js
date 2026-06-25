@@ -269,6 +269,29 @@ function registerTools(server) {
       return { content: [{ type: 'text', text: `Books (${rows.length}):\n\n${lines.join('\n')}` }] };
     }
   );
+
+  server.tool(
+    'get_book_notes',
+    'Get all notes saved for a specific book. Use get_books first if you need to check exact book titles.',
+    { title: z.string().describe('The book title to fetch notes for (partial match supported)') },
+    async ({ title }) => {
+      const { rows: books } = await db.execute({
+        sql: `SELECT * FROM books WHERE title LIKE ? ORDER BY added_at DESC LIMIT 1`,
+        args: [`%${title}%`],
+      });
+      if (!books.length) return { content: [{ type: 'text', text: `No book found matching "${title}".` }] };
+      const book = books[0];
+      const { rows: notes } = await db.execute({
+        sql: `SELECT text, created_at FROM notes WHERE book_id = ? ORDER BY created_at ASC`,
+        args: [book.id],
+      });
+      if (!notes.length) return { content: [{ type: 'text', text: `**${book.title}** has no notes yet.` }] };
+      const lines = notes.map((n, i) =>
+        `${i + 1}. ${n.text}\n   _${new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}_`
+      );
+      return { content: [{ type: 'text', text: `Notes for **${book.title}** (${notes.length}):\n\n${lines.join('\n\n')}` }] };
+    }
+  );
 }
 
 // ── Streamable HTTP transport (stateful sessions) ─────────────────────────────
