@@ -10,6 +10,7 @@ import wordsRouter from './routes/words.js';
 import booksRouter from './routes/books.js';
 import statsRouter from './routes/stats.js';
 import graphRouter from './routes/graph.js';
+import { mcpRouter } from './mcp.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -23,6 +24,7 @@ app.use('/api/words', wordsRouter);
 app.use('/api/books', booksRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/graph', graphRouter);
+app.use('/mcp', mcpRouter);
 
 const distDir = join(__dirname, '../client/dist');
 if (existsSync(distDir)) {
