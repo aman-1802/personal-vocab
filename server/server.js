@@ -24,6 +24,11 @@ app.use('/api/words', wordsRouter);
 app.use('/api/books', booksRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/graph', graphRouter);
+// OAuth discovery at root (RFC 8414 — some clients check here instead of /mcp)
+app.get('/.well-known/oauth-authorization-server', (_req, res) => {
+  res.redirect('/mcp/.well-known/oauth-authorization-server');
+});
+
 app.use('/mcp', mcpRouter);
 
 const distDir = join(__dirname, '../client/dist');
