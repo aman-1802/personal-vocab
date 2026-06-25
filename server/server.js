@@ -24,10 +24,20 @@ app.use('/api/words', wordsRouter);
 app.use('/api/books', booksRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/graph', graphRouter);
-// OAuth discovery at root (RFC 8414 — some clients check here instead of /mcp)
-app.get('/.well-known/oauth-authorization-server', (_req, res) => {
-  res.redirect('/mcp/.well-known/oauth-authorization-server');
-});
+// OAuth discovery — RFC 8414 path-suffix form: /.well-known/oauth-authorization-server/{path}
+// Claude.ai constructs this as /.well-known/oauth-authorization-server/mcp for our /mcp base URL
+const oauthMeta = {
+  issuer: 'https://vocab.aman-n8n.site/mcp',
+  authorization_endpoint: 'https://vocab.aman-n8n.site/mcp/oauth/authorize',
+  token_endpoint: 'https://vocab.aman-n8n.site/mcp/oauth/token',
+  registration_endpoint: 'https://vocab.aman-n8n.site/mcp/oauth/register',
+  response_types_supported: ['code'],
+  grant_types_supported: ['authorization_code'],
+  code_challenge_methods_supported: ['S256'],
+  token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
+};
+app.get('/.well-known/oauth-authorization-server', (_req, res) => res.json(oauthMeta));
+app.get('/.well-known/oauth-authorization-server/mcp', (_req, res) => res.json(oauthMeta));
 
 app.use('/mcp', mcpRouter);
 
