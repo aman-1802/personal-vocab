@@ -10,6 +10,12 @@ const { json, urlencoded } = express;
 
 const BASE_URL = 'https://vocab.aman-n8n.site/mcp';
 
+// Log every incoming MCP request for debugging
+mcpRouter.use((req, _res, next) => {
+  console.log(`[MCP] ${req.method} ${req.path} | auth: ${req.headers.authorization ? 'Bearer ***' : req.query.token ? 'query-token' : 'none'}`);
+  next();
+});
+
 // ── In-memory OAuth state ─────────────────────────────────────────────────────
 const oauthClients = {};
 const authCodes = {};
@@ -30,14 +36,17 @@ mcpRouter.get('/.well-known/oauth-authorization-server', (_req, res) => {
 
 // ── OAuth: dynamic client registration (public) ───────────────────────────────
 mcpRouter.post('/oauth/register', json(), (req, res) => {
+  console.log('[MCP] register body:', JSON.stringify(req.body));
   const clientId = crypto.randomUUID();
   oauthClients[clientId] = req.body;
-  res.status(201).json({
+  const response = {
     client_id: clientId,
     client_id_issued_at: Math.floor(Date.now() / 1000),
     token_endpoint_auth_method: 'none',
     ...req.body,
-  });
+  };
+  console.log('[MCP] register response:', JSON.stringify(response));
+  res.status(201).json(response);
 });
 
 // ── OAuth: authorization page (public) ────────────────────────────────────────
