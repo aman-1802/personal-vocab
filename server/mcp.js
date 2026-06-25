@@ -1,7 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
-import { Router, json, urlencoded } from 'express';
+import express, { Router } from 'express';
+const { json, urlencoded } = express;
 import crypto from 'crypto';
 import { db } from './db.js';
 
